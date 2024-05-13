@@ -3,12 +3,15 @@ library(tidyverse)
 library(bslib)
 library(shinyWidgets)
 source('helpers.R')
+
+# Reading csv files with data
 movie_df <- read.csv('unseen_movies.csv')
 seen_movies <- read.csv('seen_movies.csv', 
                  colClasses = c('character', 'integer', 'character'))
 movie_sel <- as.character(read.csv(
   'selected_movie.csv', header = FALSE, skip = 1))
 
+# User interface
 ui <- page_sidebar(title = 'Movie List',
   sidebar = sidebar('User interface',
                     textInput('movie_name', 
@@ -26,20 +29,22 @@ ui <- page_sidebar(title = 'Movie List',
                                   'Seen movies'),
                       selected = 'Unseen movies'
                     ),
-                    br(),
                     "Random movie",
                     actionButton('random', 
                                  label = 'Draw random movie'),
+                    
+                    uiOutput('movie_select'),
                     textOutput('selected'),
                     actionButton('move_to',
                                  label = 'Move movie to seen'),
-                    br(), br(), br(),
+                    br(), br(),
                     actionButton('save', label = 'Save changes')),
   card(card_header(textOutput("card_header")),
     card_body(tableOutput('table'))
   )
 )
 
+# Server
 server <- function(input, output) {
   #defining reactive values
   movies <- reactiveVal(movie_df)
@@ -47,7 +52,8 @@ server <- function(input, output) {
   selected_movie <- reactiveVal(movie_sel)
   
   #functions reacting to user actions
-  observeEvent(input$submit, {
+  observeEvent(
+    req(input$submit, input$movie_name, input$movie_year), {
     if (check_year(input$movie_year)) {
     new_film <- data.frame('Title' = as.character(input$movie_name), 
                'Year' = as.integer(input$movie_year))
@@ -67,14 +73,20 @@ server <- function(input, output) {
     }
   }, ignoreInit = TRUE)
   observeEvent(input$random, {
+    if (nrow(movies()) > 0) {
     movie <- sample(movies()[[1]], 1)
-    selected_movie(movie)
+    selected_movie(movie)}
   })
-  observeEvent(input$move_to, {
+  observeEvent(req(!is.null(input$movie_select)), {
+    movie <- input$movie_select
+    selected_movie(movie)
+  }, ignoreInit = TRUE)
+  observeEvent(input$move_to, { 
+    if (selected_movie() != 'No movie selected' &
+        nrow(movies()) > 0) {
     moved = move_to_watched(selected_movie(), movies(), seen())
     movies(moved[[2]])
-    seen(moved[[1]])
-    selected_movie('No movie selected')
+    seen(moved[[1]])}
   })
   observeEvent(input$save, {
     ask_confirmation(
@@ -101,6 +113,13 @@ server <- function(input, output) {
   output$selected <- renderText({
     selected_movie()
   })
+  output$movie_select <- renderUI({
+    selectInput(
+      'movie_select',
+      label = 'Select movie',
+      choice = c(movies()$Title),
+      selected = c(movies()$Title[1]))
+    })
 }
 
 shinyApp(ui = ui, server = server)
