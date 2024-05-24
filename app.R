@@ -4,6 +4,13 @@ library(bslib)
 library(shinyWidgets)
 source('helpers.R')
 
+mycss <- "
+select ~ .selectize-control .selectize-input {
+  max-height: 30px;
+  overflow-y: hidden;
+}
+"
+
 # Reading csv files with data
 movie_df <- read.csv('unseen_movies.csv')
 seen_movies <- read.csv('seen_movies.csv', 
@@ -12,36 +19,56 @@ movie_sel <- as.character(read.csv(
   'selected_movie.csv', header = FALSE, skip = 1))
 
 # User interface
-ui <- page_sidebar(title = 'Movie List',
-  sidebar = sidebar('User interface',
+ui <- page_sidebar(tags$style(mycss),
+                  title = 'Movie List',
+                   theme = bs_theme(preset = 'united'),
+  sidebar = sidebar(tags$div(
+                tags$h4('User interface'),
+                style = 'text-align: center;
+                border: 1px solid black;
+                border-radius: 30px;'
+                ),
                     textInput('movie_name', 
-                              label = "Enter the title to add",
+                              label = tags$div(
+                                  "Enter the title to add",
+                                  style = 'position: relative;
+                                  left: 30px;
+                                  font-style: italic;'),
                               value = ''),
                     textInput('movie_year',
-                              label = 'Enter the production year',
+                              label = tags$div(class = 'instruction',
+                                'Enter the production year',
+                                style = 'position: relative;
+                                left: 10px;
+                                font-style: italic;'),
                               value = ''),
                     actionButton('submit', label = 'Add film'),
-                    br(), br(),
-                    selectInput(
-                      'table_type',
-                      label = 'Choose table',
-                      choices = c('Unseen movies',
-                                  'Seen movies'),
-                      selected = 'Unseen movies'
-                    ),
-                    "Random movie",
+                    br(),
+                    tags$div(tags$h5("Movie selection"),
+                             style = 'text-align: center;'),
                     actionButton('random', 
-                                 label = 'Draw random movie'),
-                    
+                                 'Draw random movie'),
                     uiOutput('movie_select'),
-                    textOutput('selected'),
+                    tags$div(textOutput('selected'),
+                             style = 'text-align: center;
+                             display: inline-block;
+                             white-space: nowrap;
+                             overflow: hidden;
+                             text-overflow: ellipsis'),
                     actionButton('move_to',
                                  label = 'Move movie to seen'),
+                    actionButton('delete',
+                                 label = 'Delete from list'),
                     br(), br(),
                     actionButton('save', label = 'Save changes')),
-  card(card_header(textOutput("card_header")),
-    card_body(tableOutput('table'))
-  )
+  card(card_header(tags$div(tags$h5("Watch list"),
+                            style = 'text-align: center;')),
+      card_body(tableOutput('table1'))
+  ),
+  card(card_header(tags$div(tags$h5("Seen list"),
+                            style = 'text-align: center;')),
+       card_body(tableOutput('table2'))
+       )
 )
 
 # Server
@@ -82,11 +109,14 @@ server <- function(input, output) {
     selected_movie(movie)
   }, ignoreInit = TRUE)
   observeEvent(input$move_to, { 
-    if (selected_movie() != 'No movie selected' &
-        nrow(movies()) > 0) {
+    if (selected_movie() %in% movies()[[1]]) {
     moved = move_to_watched(selected_movie(), movies(), seen())
     movies(moved[[2]])
     seen(moved[[1]])}
+  })
+  observeEvent(input$delete, {
+    if (selected_movie() %in% movies()[[1]]) {
+    movies(delete_movie(selected_movie(), movies()))}
   })
   observeEvent(input$save, {
     ask_confirmation(
@@ -103,12 +133,11 @@ server <- function(input, output) {
   })
   
   #Functions rendering output variables
-  output$table <- renderTable({
-    if (input$table_type == 'Unseen movies') {
+  output$table1 <- renderTable({
       movies()
-    } else {
-      seen()
-    }
+  })
+  output$table2 <- renderTable({
+    seen()
   })
   output$selected <- renderText({
     selected_movie()
@@ -116,9 +145,11 @@ server <- function(input, output) {
   output$movie_select <- renderUI({
     selectInput(
       'movie_select',
-      label = 'Select movie',
+      label = tags$div(tags$h6('Select manually'),
+                       style = 'position: relative;
+                       left: 40px'),
       choice = c(movies()$Title),
-      selected = c(movies()$Title[1]))
+      selected = NULL)
     })
 }
 

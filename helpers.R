@@ -8,6 +8,12 @@ move_to_watched <- function(movie_name, movies, seen_movies) {
   list(seen, unseen)
 }
 
+delete_movie <- function(movie_name, movies) {
+  index <- which(movies[1] == movie_name)
+  movies <- movies[-index,]
+  movies
+}
+
 check_year <- function(var) {
   year <- tryCatch(as.integer(var),
     error = function(e) {
